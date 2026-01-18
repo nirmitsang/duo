@@ -1,0 +1,108 @@
+# API Automation Context: [Insert API Name]
+
+## 1. API Metadata
+* **Method:** `[POST/GET]`
+* **Endpoint:** `[e.g., /corporate/v2/payments]`
+* **Mongo Database:** `[Database Name]`
+* **Mongo Collection:** `[Collection Name]`
+
+## 2. Authentication Mechanism
+* **Auth API Endpoint:** `[e.g., GET https://auth.internal/token]`
+* **Response Format:**
+    ```json
+    {
+      "auth": {
+        "access_token": "BEARER_TOKEN_HERE"
+      }
+    }
+    ```
+* **Token Extraction Logic:** Extract `auth.access_token` and inject into the Target API Header as `Authorization: Bearer <token>`.
+
+---
+
+## 3. Request Body Testing (Input Validation)
+*Define the parameters used to construct the request bodies.*
+
+### Parameter Set A: [Name, e.g., Standard Payment]
+| Attribute (Request) | Mapped Mongo Field | Mandatory? | Data Type | Regex Pattern | Comments |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `txnId` | `_id` | Yes | String | `^TXN\d{5}$` | Unique key |
+| `amount` | `txn_amt` | Yes | Decimal | `^\d+\.\d{2}$` | |
+| `currency` | `txn_curr` | No | String | `^[A-Z]{3}$` | Defaults to USD if null |
+
+*(Add more Parameter Sets if PnC varies significantly)*
+
+---
+
+## 4. Error Handling
+*Define expected error responses for negative scenarios.*
+
+| Error Code | Error Message Pattern | Comments |
+| :--- | :--- | :--- |
+| `400` | Starts with: `Validation Error:` | When Regex fails |
+| `401` | Exact match: `Unauthorized Access` | When token is missing/expired |
+| `500` | Contains: `Internal Processing Error` | Database connection fail |
+
+---
+
+## 5. Attribute Testing (Logic & Output)
+*This section defines how we verify the response data. Use the "Logic Types" below to generate specific test methods.*
+
+### Logic Type 1: [Name, e.g., Direct Mapping / Like-to-Like]
+
+**The Logic Rule:**
+> "Iterate through the external mapping file. For each row, fetch the value from the defined `Mongo Path`, and assert it equals the value in the API Response at `JSON Path`."
+
+**Request Body to Use:**
+* Use `Parameter Set A` with valid default values.
+
+**Attributes in Scope (Reference):**
+* **Source File:** `tests/data/direct_mapping_rules.csv`
+* **File Structure:** `Mongo_Path, JSON_Path, Data_Type`
+* **Example Content (For Context Only):**
+    | Mongo Field | Data Type | Json Response Attribute |
+    | :--- | :--- | :--- |
+    | `db.core.id` | String | `response.id` |
+    | `db.meta.ts` | Timestamp | `response.created_at` |
+    | `...` | ... | *(See source file for full 1000+ list)* |
+
+---
+
+### Logic Type 2: [Name, e.g., The Swap Scenario]
+
+**The Logic Rule:**
+> IF Request Parameter `swap_flag` is set to `TRUE`:
+> 1. Identify the "Creditor" fields and "Debtor" fields.
+> 2. The API Response for "Creditor" attributes must match the MongoDB "Debtor" data.
+> 3. The API Response for "Debtor" attributes must match the MongoDB "Creditor" data.
+
+**Request Body to Use:**
+| Attribute | Value | Mandatory |
+| :--- | :--- | :--- |
+| `swap_flag` | `true` | Yes |
+| `...` | ... | ... |
+
+**Attributes in Scope (Swap List):**
+* **Source File:** `tests/data/swap_logic_fields.csv`
+* **File Structure:** `Creditor_Json_Attr, Debtor_Mongo_Field, Debtor_Json_Attr, Creditor_Mongo_Field`
+* **Example Content:**
+    | Creditor_Attr | Matches_Mongo_Field |
+    | :--- | :--- |
+    | `creditorName` | `debtor_info.name` |
+    | `creditorAcct` | `debtor_info.acct_num` |
+    | `debtorName` | `creditor_info.name` |
+
+---
+
+### Logic Type 3: [Name, e.g., Conditional Transformation]
+
+**The Logic Rule:**
+> IF `Mongo Field X` == "Tier1" THEN `JSON Attribute Y` must be "Priority"
+> ELSE `JSON Attribute Y` must be "Standard"
+
+**Request Body:** Standard.
+
+**Attributes in Scope:**
+| Mongo Field | Json Attribute | Logic Condition |
+| :--- | :--- | :--- |
+| `client_tier` | `priorityLevel` | If 'Tier1'->'Priority', else 'Standard' |
