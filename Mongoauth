@@ -1,0 +1,132 @@
+## Perfect — Everything We Need Is in Place! 🎯
+
+Let me answer your server question first as it's important, then we'll do the config.
+
+---
+
+## How This Works on a Server in the Future
+
+Right now on your laptop:
+```
+klist shows tickets = Windows is already 
+logged into Kerberos automatically
+because you're on a corporate laptop
+```
+
+On a server it works differently:
+```
+Server doesn't have a logged-in user
+        ↓
+Keytab file acts as an 
+"automatic password file" for Kerberos
+        ↓
+Application uses keytab to get 
+Kerberos tickets without human login
+```
+
+Think of it like this:
+
+| Environment | How Kerberos Authenticates |
+|---|---|
+| Your laptop | Uses YOUR windows login automatically |
+| Server/Production | Uses the **keytab file** to authenticate automatically |
+
+This is exactly why you have the keytab file — it's the server's equivalent of your Windows login. ✅
+
+---
+
+## Now Let's Configure It
+
+### Step 1 — Place Your Files
+Put both files in your working directory:
+```
+C:\Users\G01516271\kafka-connect-test\
+    ├── worker.properties
+    ├── mongodb-sink.properties
+    ├── truststore.jks
+    ├── keystore.jks
+    ├── your-keytab.keytab        ← add here
+    └── cert.pem                  ← add here
+```
+
+---
+
+### Step 2 — Import PEM into a Truststore
+
+Your `cert.pem` is the MongoDB server's CA certificate. Java can't read PEM directly — we need to import it into a JKS truststore using Java's `keytool`.
+
+Run this in Command Prompt:
+```cmd
+"C:\Program Files\Java\jdk-17.0.2\bin\keytool.exe" -importcert -trustcacerts -file C:\Users\G01516271\kafka-connect-test\cert.pem -keystore C:\Users\G01516271\kafka-connect-test\mongo-truststore.jks -storepass changeit -alias mongoCA -noprompt
+```
+
+This creates a new `mongo-truststore.jks` file that Java can use to trust your MongoDB server.
+
+---
+
+### Step 3 — Create a JAAS Config File
+
+JAAS (Java Authentication and Authorization Service) is how Java talks to Kerberos. Create a new file:
+
+`C:\Users\G01516271\kafka-connect-test\jaas.conf`
+
+```
+com.sun.security.jgss.krb5.initiate {
+    com.sun.security.auth.module.Krb5LoginModule required
+    useKeyTab=true
+    keyTab="C:/Users/G01516271/kafka-connect-test/your-keytab.keytab"
+    principal="YOUR_KERBEROS_PRINCIPAL"
+    storeKey=true
+    isInitiator=true;
+};
+```
+
+> ⚠️ Replace `YOUR_KERBEROS_PRINCIPAL` — this is the Kerberos identity tied to your keytab. Ask your MongoDB/infra team:
+> "What is the Kerberos principal associated with our keytab file?"
+> It looks something like `mongodb/hostname@DOMAIN.COM`
+
+---
+
+### Step 4 — Update `mongodb-sink.properties`
+
+Change your connection URI:
+```properties
+connection.uri=mongodb://user@glodsr02z02401.intranet.barcapint.com:27181/?authMechanism=GSSAPI&authSource=$external&tls=true&tlsCAFile=C:/Users/G01516271/kafka-connect-test/cert.pem
+```
+
+Key changes:
+- `authMechanism=PLAIN` → `authMechanism=GSSAPI`
+- Added `tlsCAFile` pointing to your PEM
+- Removed `tlsInsecure=true` — no longer needed since we have the real cert now ✅
+
+---
+
+### Step 5 — Update Startup Command
+
+Add the JAAS config to your startup:
+```cmd
+set KAFKA_OPTS=-Djavax.net.ssl.trustStoreType=WINDOWS-ROOT -Djava.security.auth.login.config=C:\Users\G01516271\kafka-connect-test\jaas.conf
+
+set KAFKA_HEAP_OPTS=-Xms256m -Xmx1g
+
+bsp\opt\kafka_2.13-2.8.0\bin\windows\connect-standalone.bat kafka-connect-test\worker.properties kafka-connect-test\mongodb-sink.properties
+```
+
+---
+
+## Summary of What Each Piece Does
+
+| Piece | Purpose |
+|---|---|
+| `cert.pem` → `mongo-truststore.jks` | Java trusts MongoDB's SSL certificate |
+| `jaas.conf` | Tells Java how to use keytab for Kerberos |
+| `keytab file` | Proves your identity to MongoDB without a password |
+| `authMechanism=GSSAPI` | Tells MongoDB driver to use Kerberos |
+
+---
+
+## Before You Do All This
+
+Get the **Kerberos principal** from your infra team — without that the `jaas.conf` won't work.
+
+What does your infra team say the principal is? 🎯
