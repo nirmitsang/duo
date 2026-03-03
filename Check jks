@@ -1,0 +1,37 @@
+## Great Spot! You're Absolutely Right! 🎯
+
+Look at warning 2 in the logs:
+```
+Connection string contains unsupported option 'tlscafile'
+```
+
+This **confirms** `tlsCAFile` doesn't work in this driver version. And yes — we created the JKS but never actually used it! My mistake for not catching that earlier.
+
+---
+
+## The Fix — Remove PEM from URI, Use JKS Instead
+
+### Update `mongodb-sink.properties`
+
+Remove `tlsCAFile` from the URI completely:
+```properties
+connection.uri=mongodb://user@glodsr02z02401.intranet.barcapint.com:27181/?authMechanism=GSSAPI&authSource=$external&tls=true
+```
+
+Then add these separate properties below it:
+```properties
+ssl.enabled=true
+ssl.truststore=C:\\Users\\G01516271\\kafka-connect-test\\mongo-truststore.jks
+ssl.truststore.password=changeit
+```
+
+---
+
+## But First — Verify JKS Was Created Correctly
+
+Run this:
+```cmd
+"C:\Program Files\Java\jdk-17.0.2\bin\keytool.exe" -list -keystore C:\Users\G01516271\kafka-connect-test\mongo-truststore.jks -storepass changeit
+```
+
+Tell me if you see `mongoCA` listed — if the import failed earlier we need to redo it before anything else. 🎯
