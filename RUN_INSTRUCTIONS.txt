@@ -84,3 +84,24 @@ Come back and share:
 
 We will then update the mongodb-sink.properties connector config to use that truststore.
 =============================================
+
+
+
+
+
+
+
+Good information. Since JDK 17.0.2 is installed at `C:\Program Files\Java\jdk-17.0.2\`, `javac` is definitely there — we'll just use the full path so there's no ambiguity.
+
+Here's the plan: I'll write a small Java test that tries connecting to MongoDB with each truststore, so you can run it right now. Let me put this together.Here's what to do:
+
+**Drop `MongoConnectTest.java` into `C:\Users\G01516271\kafka-connect-test\`**, then follow the instructions file. In short:
+
+1. **Run `klist` first** — confirm your Kerberos ticket is active before anything else
+2. **Compile** using the full `javac` path (in the instructions — uses JARs you already have, nothing new needed)
+3. **Run Step 2A** (mongo-truststore.jks), then **Step 2B** (truststore.jks with appended certs) if 2A fails
+
+The program will print a clear `SUCCESS` or `FAILED` with a categorised error message — `SSLHandshakeException` means wrong truststore, `GSSException` means Kerberos issue, etc. No guesswork.
+
+Once you run it, share the output here and we'll know exactly what's working and what to fix before touching the connector again.
+
