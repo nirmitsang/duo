@@ -1,0 +1,39 @@
+## Interesting — Cert Is There But Still Failing 🤔
+
+This tells us the problem is NOT about the certificate being missing. It's about **how the connector is loading the truststore**.
+
+---
+
+## What's Actually Happening
+
+The MongoDB Sink Connector 1.13.0 may not support `connection.ssl.truststore.*` properties at all — it might be ignoring them completely and falling back to the **default JVM truststore** which doesn't have the cert.
+
+---
+
+## The Fix — Force It at JVM Level
+
+Instead of trusting connector properties to load the truststore, tell the **entire JVM** to use your truststore directly via `KAFKA_OPTS`:
+
+```cmd
+SET KAFKA_OPTS=-Djava.security.krb5.conf=C:\ProgramData\MIT\Kerberos5\krb5.ini -Djava.security.auth.login.config=C:\Users\G01516271\kafka-connect-test\jaas.conf -Djavax.security.auth.useSubjectCredsOnly=false -Djavax.net.ssl.trustStore=C:\Users\G01516271\kafka-connect-test\truststore.jks -Djavax.net.ssl.trustStorePassword=YOUR_TRUSTSTORE_PASSWORD
+
+SET KAFKA_HEAP_OPTS=-Xms256m -Xmx1g
+
+bsp\opt\kafka_2.13-2.8.0\bin\windows\connect-standalone.bat kafka-connect-test\worker.properties kafka-connect-test\mongodb-sink.properties
+```
+
+---
+
+## Why This Works
+
+```
+Before:
+Connector property → connector ignores it → uses default JVM truststore → cert not found ❌
+
+After:
+JVM flag → entire JVM uses your truststore → cert found ✅
+```
+
+This is the same logic as how we fixed Kafka SSL — JVM level always wins over application level.
+
+Try this and tell me what the logs say! 🎯
