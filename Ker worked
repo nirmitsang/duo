@@ -1,0 +1,102 @@
+## Excellent Work! Duo's Analysis is Spot On 🎯
+
+These findings are gold. Let me break down each change and why it matters:
+
+---
+
+## Summary of All 7 Changes Duo Found
+
+### 1. ✅ Custom Kerberos Service Name
+Most important finding. MongoDB here uses `sysmngcustlet2` not the default `mongodb`:
+```properties
+connection.uri=...?authMechanism=GSSAPI&authSource=$external&authMechanismProperties=SERVICE_NAME:sysmngcustlet2&ssl=true...
+```
+
+### 2. ✅ Both Replica Set Hosts
+```properties
+connection.uri=mongodb://user@glodsr02z02401.intranet.barcapint.com:27181,slodsr02z02373.intranet.barcapint.com:27181/...
+```
+
+### 3. ✅ Database in URI
+```properties
+connection.uri=mongodb://...@host:port/odsCorporate?authMechanism=...
+```
+
+### 4. ✅ Correct Truststore Property Names
+```properties
+connection.ssl.truststore.location=C:\\...\\mongo-truststore.jks
+connection.ssl.truststore.password=changeit
+```
+
+### 5. ✅ JAAS Fix — `renewTGT=false`
+```
+renewTGT=false  ← was true, conflicts with useKeyTab=true
+```
+
+### 6. ✅ Full Startup Command
+```cmd
+SET KAFKA_OPTS=-Djava.security.krb5.conf=C:\ProgramData\MIT\Kerberos5\krb5.ini -Djava.security.auth.login.config=C:\Users\G01516271\kafka-connect-test\jaas.conf -Djavax.security.auth.useSubjectCredsOnly=false
+```
+
+### 7. ✅ krb5.ini Already Exists
+At `C:\ProgramData\MIT\Kerberos5\krb5.ini` — copied from Linux server
+
+---
+
+## Now Let's Apply All Changes
+
+### Update `mongodb-sink.properties`
+```properties
+name=evstm-mongodb-sink
+connector.class=com.mongodb.kafka.connect.MongoSinkConnector
+tasks.max=1
+topics=connect_test_topic_secured
+
+# Updated connection URI with all fixes
+connection.uri=mongodb://user@glodsr02z02401.intranet.barcapint.com:27181,slodsr02z02373.intranet.barcapint.com:27181/odsCorporate?authMechanism=GSSAPI&authSource=$external&authMechanismProperties=SERVICE_NAME:sysmngcustlet2&ssl=true
+
+# Correct truststore properties
+connection.ssl.truststore.location=C:\\Users\\G01516271\\kafka-connect-test\\mongo-truststore.jks
+connection.ssl.truststore.password=changeit
+
+consumer.override.group.id=evstm-mongodb-sink
+key.converter=org.apache.kafka.connect.json.JsonConverter
+value.converter=org.apache.kafka.connect.json.JsonConverter
+key.converter.schemas.enable=false
+value.converter.schemas.enable=false
+```
+
+---
+
+### Update `jaas.conf`
+```
+com.sun.security.jgss.krb5.initiate {
+    com.sun.security.auth.module.Krb5LoginModule required
+    useKeyTab=true
+    keyTab="C:/Users/G01516271/kafka-connect-test/your-keytab.keytab"
+    principal="YOUR_KERBEROS_PRINCIPAL"
+    storeKey=true
+    isInitiator=true
+    useTicketCache=false
+    renewTGT=false;
+};
+```
+
+---
+
+### Updated Startup Command
+```cmd
+SET KAFKA_OPTS=-Djava.security.krb5.conf=C:\ProgramData\MIT\Kerberos5\krb5.ini -Djava.security.auth.login.config=C:\Users\G01516271\kafka-connect-test\jaas.conf -Djavax.security.auth.useSubjectCredsOnly=false
+
+SET KAFKA_HEAP_OPTS=-Xms256m -Xmx1g
+
+bsp\opt\kafka_2.13-2.8.0\bin\windows\connect-standalone.bat kafka-connect-test\worker.properties kafka-connect-test\mongodb-sink.properties
+```
+
+---
+
+## Key Lesson Here 💡
+
+> The Ab Initio config was actually a treasure map — it had all the correct MongoDB connection details your organisation uses. Always check existing working configurations in your environment before guessing values.
+
+Apply all these changes and restart — this should work! Tell me what the logs say 🎯
