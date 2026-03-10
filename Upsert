@@ -1,0 +1,14 @@
+First:
+{"_id": "test001", "name": "John", "amount": 500}
+Second (same _id, different value):
+{"_id": "test001", "name": "John", "amount": 999}
+Check Compass
+
+
+Add these lines at the bottom:
+# Upsert configuration
+document.id.strategy=com.mongodb.kafka.connect.sink.processor.id.strategy.PartialValueStrategy
+document.id.strategy.partial.value.projection.list=_id
+document.id.strategy.partial.value.projection.type=AllowList
+mongodb.write.model.strategy=com.mongodb.kafka.connect.sink.writemodel.strategy.ReplaceOneBusinessKeyStrategy
+Also 
