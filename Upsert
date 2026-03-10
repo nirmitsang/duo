@@ -12,3 +12,10 @@ document.id.strategy.partial.value.projection.list=_id
 document.id.strategy.partial.value.projection.type=AllowList
 mongodb.write.model.strategy=com.mongodb.kafka.connect.sink.writemodel.strategy.ReplaceOneBusinessKeyStrategy
 Also 
+Startup Command
+SET KAFKA_OPTS=-Djava.security.krb5.conf=C:\ProgramData\MIT\Kerberos5\krb5.ini -Djava.security.auth.login.config=C:\Users\G01516271\kafka-connect-test\jaas.conf -Djavax.security.auth.useSubjectCredsOnly=false -Djavax.net.ssl.trustStore=C:\Users\G01516271\kafka-connect-test\truststore.jks -Djavax.net.ssl.trustStorePassword=YOUR_PASSWORD
+
+SET KAFKA_HEAP_OPTS=-Xms256m -Xmx1g
+
+bsp\opt\kafka_2.13-2.8.0\bin\windows\connect-standalone.bat kafka-connect-test\worker.properties kafka-connect-test\mongodb-sink.properties
+worker.properties Key Settings
