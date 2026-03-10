@@ -1,0 +1,11 @@
+Create a startup .bat file so you never have to type this again and avoid these mistakes:
+# Create a file: C:\Users\G01516271\kafka-connect-test\start-connector.bat
+
+SET KAFKA_OPTS=-Djava.security.krb5.conf=C:\ProgramData\MIT\Kerberos5\krb5.ini -Djava.security.auth.login.config=C:\Users\G01516271\kafka-connect-test\jaas.conf -Djavax.security.auth.useSubjectCredsOnly=false -Djavax.net.ssl.trustStore=C:\Users\G01516271\kafka-connect-test\truststore.jks -Djavax.net.ssl.trustStorePassword=YOUR_CORRECT_PASSWORD
+
+SET KAFKA_HEAP_OPTS=-Xms256m -Xmx1g
+
+bsp\opt\kafka_2.13-2.8.0\bin\windows\connect-standalone.bat kafka-connect-test\worker.properties kafka-connect-test\mongodb-sink.properties
+Next time just run:
+start-connector.bat
+Run it and tell me if upsert works! 🎯
