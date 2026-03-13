@@ -1,0 +1,19 @@
+# Check if native GSS library exists
+echo "=== Checking GSS Library ==="
+ls -la /usr/lib64/libgssapi_krb5.so.2 || echo "NOT FOUND at /usr/lib64/"
+ls -la /usr/lib/x86_64-linux-gnu/libgssapi_krb5.so.2 || echo "NOT FOUND at /usr/lib/x86_64/"
+
+# Find it wherever it is
+echo "=== Finding GSS Library ==="
+find / -name "libgssapi_krb5.so*" 2>/dev/null
+
+# Check Java version and crypto support
+echo "=== Java Security ==="
+java -XshowSettings:all 2>&1 | grep -i crypto
+
+
+Add this to your Dockerfile after Java installation:
+# Enable unlimited JCE for AES256 Kerberos
+RUN find /usr/lib/jvm -name "java.security" | xargs -I{} sed -i \
+    's/^#crypto.policy=unlimited/crypto.policy=unlimited/' {}
+Rebuild
