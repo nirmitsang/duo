@@ -17,3 +17,22 @@ Add this to your Dockerfile after Java installation:
 RUN find /usr/lib/jvm -name "java.security" | xargs -I{} sed -i \
     's/^#crypto.policy=unlimited/crypto.policy=unlimited/' {}
 Rebuild
+
+
+
+
+explicit version:
+# Find and fix java.security for AES256 support
+RUN JAVA_SEC=$(find /usr/lib/jvm -name "java.security" 2>/dev/null | head -1) && \
+    echo "Found java.security at: $JAVA_SEC" && \
+    echo "crypto.policy=unlimited" >> $JAVA_SEC && \
+    cat $JAVA_SEC | grep crypto
+This:
+Finds the exact java.security file location
+Appends crypto.policy=unlimited directly
+Verifies it was added
+Also Add This Debug Line in entrypoint.sh
+Replace the Java Security check with:
+echo "=== Java Security ==="
+find /usr/lib/jvm -name "java.security" 2>/dev/null | head -1 | xargs grep crypto
+This will confirm the policy is actually set inside the container.
