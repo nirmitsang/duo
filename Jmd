@@ -1,0 +1,69 @@
+Two Changes Needed
+1. Update jaas.conf — Use Ticket Cache Instead of Keytab for MongoDB Section
+com.sun.security.jgss.krb5.initiate {
+    com.sun.security.auth.module.Krb5LoginModule required
+    useTicketCache=true
+    ticketCache="/tmp/krb5cc_kafkaconnect"
+    renewTGT=false
+    doNotPrompt=true
+    useKeyTab=false
+    debug=true;
+};
+Key changes:
+useKeyTab=false — don't try to use keytab in Java
+useTicketCache=true — use the ticket kinit already obtained
+ticketCache="/tmp/krb5cc_kafkaconnect" — exact location kinit stored the ticket
+2. Update entrypoint.sh KAFKA_OPTS — Keep Native GSS Flags
+export KAFKA_OPTS="-Djava.security.krb5.conf=/opt/secrets/krb5/krb5.ini \
+-Djava.security.auth.login.config=/opt/kafka-connect/config/jaas.conf \
+-Djavax.security.auth.useSubjectCredsOnly=false \
+-Dsun.security.jgss.native=true \
+-Dsun.security.jgss.lib=/usr/lib64/libgssapi_krb5.so.2 \
+-Djavax.net.ssl.trustStore=/opt/secrets/truststore/truststore.jks \
+-Djavax.net.ssl.trustStorePassword=changeit \
+-Dsun.security.krb5.debug=true"
+3. Remove JCE Fix from Dockerfile
+Since Java won't do crypto itself anymore, remove the problematic RUN JAVA_SEC block entirely:
+FROM barclays-registry-prod-v4-uk.barcapint.com/barclays/ubi8:latest
+
+LABEL prisma_email_alert="modemanuradhasai.shakti@barclays.com"
+
+USER root
+WORKDIR /opt
+
+# Install Java 21 + Kerberos client tools
+RUN dnf -y install java-21-openjdk-headless krb5-workstation && \
+    dnf -y clean all && \
+    rm -rf /var/cache/dnf
+
+# Verify kerberos tools exist
+RUN which kinit && which klist
+
+# Copy Kafka + plugins
+COPY kafka /opt/kafka
+COPY plugins /opt/kafka/plugins
+
+# Copy configs
+COPY config/jaas.conf /opt/kafka-connect/config/jaas.conf
+COPY config/worker.properties /opt/kafka-connect/config/worker.properties
+COPY config/mongodb-sink.properties /opt/kafka-connect/config/mongodb-sink.properties
+
+# Entrypoint
+COPY entrypoint.sh /opt/kafka-connect/entrypoint.sh
+
+# OpenShift permissions
+RUN chmod +x /opt/kafka-connect/entrypoint.sh && \
+    chmod -R g+rwX /opt/kafka /opt/kafka-connect && \
+    chgrp -R 0 /opt/kafka /opt/kafka-connect
+
+USER 1001
+EXPOSE 8083
+ENTRYPOINT ["/opt/kafka-connect/entrypoint.sh"]
+Why This Will Work
+Before:
+jaas.conf → useKeyTab=true → Java tries AES256 crypto → FAILS ❌
+
+After:
+kinit → gets ticket using native lib → stores in /tmp/krb5cc_kafkaconnect
+jaas.conf → useTicketCache=true → Java picks up existing ticket → NO crypto needed ✅
+Make these changes, rebuild and redeploy!
